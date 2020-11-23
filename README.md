@@ -10,6 +10,22 @@ Maintains a pool of WebDriver sessions to provide concurrent requests.
 
 ## Usage
 
+sushii image server requires a WebDriver compatible process running in order
+to connect to a headless browser.
+
+An example to run ChromeDriver and Google Chrome with Docker:
+
+```bash
+docker run \
+    -p 4444:4444 \
+    --privileged \
+    -v /dev/shm:/dev/shm \
+    robcherry/docker-chromedriver:latest
+```
+
+FireFox via geckodriver to be supported soon, as Google products and services
+would be best avoided.
+
 ## Example
 
 ```bash
