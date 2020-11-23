@@ -6,6 +6,8 @@ use std::io::prelude::*;
 
 #[rocket::async_test]
 async fn template_responds_with_image() {
+    tracing_subscriber::fmt().init();
+
     let client = Client::tracked(super::rocket().unwrap())
         .await
         .expect("valid rocket");

@@ -20,6 +20,10 @@ impl Manager<Client, Error> for BrowserManager {
     async fn create(&self) -> Result<Client> {
         let mut client = Client::new(&self.url).await?;
 
+        // Browser windows/tabs will NOT be closed, which is good so that
+        // sessions can be recycled. HOWEVER this causes a memory leak in the
+        // ChromeDriver Docker image as when sushii-image-server exits, windows
+        // stay open and will accumulate.
         client.persist().await?;
 
         Ok(client)
@@ -28,3 +32,4 @@ impl Manager<Client, Error> for BrowserManager {
         Ok(())
     }
 }
+
