@@ -1,0 +1,31 @@
+[package]
+name = "sushii-image-server2"
+version = "0.1.0"
+authors = ["drklee3 <derrick@dlee.dev>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+fantoccini = "0.14.2"
+prometheus = "0.10.0"
+serde = "1.0.117"
+handlebars = { version = "3.5.1", features = ["dir_source"] }
+anyhow = "1.0.34"
+async-trait = "0.1.42"
+deadpool = "0.6.0"
+
+[dependencies.rocket]
+# rocket = "^0.4"
+version = "0.5.0-dev"
+git = "https://github.com/SergioBenitez/Rocket"
+
+[dependencies.rocket_contrib]
+# version = "^0.4"
+git = "https://github.com/SergioBenitez/Rocket"
+default-features = false
+features = ["handlebars_templates", "serve", "json"]
+
+[dependencies.rocket_prometheus]
+git = "https://github.com/sd2k/rocket_prometheus"
+branch = "async"
