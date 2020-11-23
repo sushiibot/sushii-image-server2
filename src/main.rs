@@ -14,6 +14,7 @@ use rocket_contrib::json::Json;
 use rocket_contrib::json::JsonValue;
 use serde::Deserialize;
 use std::result::Result as StdResult;
+use rocket_prometheus::PrometheusMetrics;
 
 mod browser_pool;
 mod config;
@@ -41,6 +42,8 @@ async fn template(
     hbs: State<'_, Handlebars<'_>>,
     pool: State<'_, Pool>,
 ) -> StdResult<Content<Vec<u8>>, Debug<Error>> {
+    tracing::info!("Pool status: {:#?}", pool.status());
+
     let mut conn = pool.get().await.unwrap();
 
     let html = hbs
@@ -52,6 +55,9 @@ async fn template(
         .await
         .map_err(Error::new)
         .map_err(Debug)?;
+
+    let session_id = conn.session_id().await;
+    tracing::info!("session ID: {:?}", session_id);
 
     // client can only have 1 at a time??
     let bytes = conn.screenshot().await.map_err(Error::new).map_err(Debug)?;
@@ -74,9 +80,12 @@ fn rocket() -> Result<rocket::Rocket> {
     let mgr = BrowserManager::new(&config.webdriver_url);
     let pool = Pool::new(mgr, 4);
 
+    let prometheus = PrometheusMetrics::new();
+
     let r = rocket::custom(figment)
         .manage(pool)
         .manage(handlebars)
+        .attach(prometheus.clone())
         .mount("/", routes![index, template]);
 
     Ok(r)
@@ -84,6 +93,7 @@ fn rocket() -> Result<rocket::Rocket> {
 
 #[rocket::main]
 async fn main() -> Result<()> {
+    tracing_subscriber::fmt().init();
     rocket()?.launch().await?;
 
     Ok(())
