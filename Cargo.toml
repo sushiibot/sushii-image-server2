@@ -24,7 +24,7 @@ git = "https://github.com/SergioBenitez/Rocket"
 # version = "^0.4"
 git = "https://github.com/SergioBenitez/Rocket"
 default-features = false
-features = ["handlebars_templates", "serve", "json"]
+features = ["serve", "json"]
 
 [dependencies.rocket_prometheus]
 git = "https://github.com/sd2k/rocket_prometheus"
