@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 #[macro_use]
 extern crate rocket;
 
@@ -61,13 +64,9 @@ fn index() -> &'static str {
     "Hello, world!"
 }
 
-#[rocket::main]
-async fn main() -> Result<()> {
+fn rocket() -> Result<rocket::Rocket> {
     let figment = rocket::Config::figment();
-
     let config: Config = figment.extract()?;
-
-    // let webdriver_client = WebDriverClient::new(&config.webdriver_url).await?;
 
     let mut handlebars = Handlebars::new();
     handlebars.register_templates_directory(".hbs", "templates/")?;
@@ -75,12 +74,17 @@ async fn main() -> Result<()> {
     let mgr = BrowserManager::new(&config.webdriver_url);
     let pool = Pool::new(mgr, 4);
 
-    rocket::custom(figment)
+    let r = rocket::custom(figment)
         .manage(pool)
         .manage(handlebars)
-        .mount("/", routes![index, template])
-        .launch()
-        .await?;
+        .mount("/", routes![index, template]);
+
+    Ok(r)
+}
+
+#[rocket::main]
+async fn main() -> Result<()> {
+    rocket()?.launch().await?;
 
     Ok(())
 }

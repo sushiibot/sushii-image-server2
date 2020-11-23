@@ -1,2 +1,2 @@
 [default]
-webdriver_url = "http://78.46.220.142:4444"
+webdriver_url = "http://127.0.0.1:4444"
