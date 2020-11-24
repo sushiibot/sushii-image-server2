@@ -1,5 +1,6 @@
 #[cfg(test)]
-#[macro_use] extern crate bencher;
+#[macro_use]
+extern crate bencher;
 
 #[cfg(test)]
 mod tests;
@@ -8,26 +9,23 @@ mod tests;
 extern crate rocket;
 
 use anyhow::{Error, Result};
+use deadpool::unmanaged::{Object, Pool};
+use fantoccini::Client;
 use handlebars::Handlebars;
+use rocket::fairing::AdHoc;
 use rocket::http::ContentType;
 use rocket::response::content::Content;
 use rocket::response::Debug;
 use rocket::State;
-use rocket::fairing::AdHoc;
 use rocket_contrib::json::Json;
 use rocket_contrib::json::JsonValue;
+use rocket_prometheus::PrometheusMetrics;
 use serde::Deserialize;
 use std::result::Result as StdResult;
-use rocket_prometheus::PrometheusMetrics;
 use tokio::signal::unix::{signal, SignalKind};
-use fantoccini::Client;
 
-mod browser_pool;
 mod config;
 
-use deadpool::unmanaged::{Pool, Object};
-
-// use browser_pool::{BrowserPoolManager, BrowserPool, Pool, PersistedBrowserPool, BrowserManager};
 use config::Config;
 
 #[derive(Deserialize)]
@@ -52,11 +50,14 @@ async fn template(
     config: State<'_, Config>,
 ) -> StdResult<Content<Vec<u8>>, Debug<Error>> {
     let status = pool.status();
+    tracing::info!("Pool status: {:?}", status);
 
     let mut conn = if let Some(client) = Object::take(pool.get().await) {
         client
     } else {
-        Client::new(&config.webdriver_url).await.map_err(Error::new)?
+        Client::new(&config.webdriver_url)
+            .await
+            .map_err(Error::new)?
     };
 
     let html = hbs
@@ -101,50 +102,21 @@ fn rocket() -> Result<rocket::Rocket> {
     handlebars.register_templates_directory(".hbs", "templates/")?;
 
     let pool_size = config.pool_size.unwrap_or(4);
-
-    let pool_init: Vec<Option<Client>> = (0..pool_size).map(|_| None).collect();
-
+    let pool_init: Vec<Option<Client>> = vec![None; pool_size];
     let pool = Pool::from(pool_init);
 
-    // Select pool type
-    /*
-    let pool: Pool = match config.pool_type.map_or("ephemeral", |t| t.as_str()) {
-        "persisted" => {
-            let mgr = BrowserManager::new(&config.webdriver_url);
-            let pool = PersistedBrowserPool::new(mgr, pool_size);
-
-            pool.into()
-        },
-        "ephemeral" => {
-            BrowserPool::new(&config.webdriver_url, pool_size).into()
-        }
-        _ => {
-            anyhow::bail!("Invalid browser pool type, requires either `persisted`, `ephemeral`");
-        }
-    };
-    */
-
     tracing::info!("Config: {:#?}", &config);
-    tracing::info!("Connecting to WebDriver URL: {}", &config.webdriver_url);
+    tracing::info!("Using WebDriver URL: {}", &config.webdriver_url);
 
     let prometheus = PrometheusMetrics::new();
 
     let r = rocket::custom(figment)
-        .manage(pool)
+        .manage(pool.clone())
         .manage(handlebars)
         .attach(prometheus.clone())
         .attach(AdHoc::config::<Config>())
         .mount("/", routes![index, template]);
 
-    Ok(r)
-}
-
-#[rocket::main]
-async fn main() -> Result<()> {
-    tracing_subscriber::fmt().init();
-    let r = rocket()?;
-
-    /*
     let handle = r.shutdown();
 
     let signal_kinds = vec![
@@ -155,28 +127,31 @@ async fn main() -> Result<()> {
 
     for signal_kind in signal_kinds {
         let mut stream = signal(signal_kind).unwrap();
-        let shard_manager = client.shard_manager.clone();
+        let handle = handle.clone();
         let pool = pool.clone();
-        let mut metrics_sender = metrics_sender.clone();
 
         tokio::spawn(async move {
             stream.recv().await;
             tracing::info!("Signal received, shutting down...");
-            shard_manager.lock().await.shutdown_all().await;
+            handle.shutdown();
 
-            tracing::info!("Closing database pool...");
-            pool.close().await;
-
-            tracing::info!("Shutting down metrics server...");
-            metrics_sender
-                .send(())
-                .await
-                .expect("Failed to shut down metrics server");
+            let status = pool.status();
+            tracing::info!("Closing browser pool... ({} objects)", status.size);
+            for _ in 0..status.size {
+                pool.remove().await;
+            }
 
             tracing::info!("bye");
         });
     }
-    */
+
+    Ok(r)
+}
+
+#[rocket::main]
+async fn main() -> Result<()> {
+    tracing_subscriber::fmt().init();
+    let r = rocket()?;
 
     // Start server
     r.launch().await?;
