@@ -23,6 +23,9 @@ docker run \
     robcherry/docker-chromedriver:latest
 ```
 
+Add `-e CHROMEDRIVER_WHITELISTED_IPS=''` as a parameter in order to run without
+authentication.
+
 FireFox via geckodriver to be supported soon, as Google products and services
 would be best avoided.
 
@@ -32,3 +35,16 @@ would be best avoided.
 curl localhost:8000/template \
       -d '{"name": "test", "width": 1280, "height": 720, "ctx": {"name": "Bob", "age": 30 }}' > image.png
 ```
+
+## Benchmark
+
+```bash
+bombardier
+    -c 5 \
+    -n 500 \
+    --method=POST \
+    --body='{"name": "test", "width": 1280, "height": 720, "ctx": {"name": "Bob", "age": 30 }}' \
+    http://127.0.0.1:8000/template
+```
+
+
