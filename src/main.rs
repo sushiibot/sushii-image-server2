@@ -13,17 +13,21 @@ use rocket::http::ContentType;
 use rocket::response::content::Content;
 use rocket::response::Debug;
 use rocket::State;
+use rocket::fairing::AdHoc;
 use rocket_contrib::json::Json;
 use rocket_contrib::json::JsonValue;
 use serde::Deserialize;
 use std::result::Result as StdResult;
 use rocket_prometheus::PrometheusMetrics;
 use tokio::signal::unix::{signal, SignalKind};
+use fantoccini::Client;
 
 mod browser_pool;
 mod config;
 
-use browser_pool::{Manager, BrowserPool};
+use deadpool::unmanaged::{Pool, Object};
+
+// use browser_pool::{BrowserPoolManager, BrowserPool, Pool, PersistedBrowserPool, BrowserManager};
 use config::Config;
 
 #[derive(Deserialize)]
@@ -44,11 +48,16 @@ struct TemplateContext {
 async fn template(
     template_ctx: Json<TemplateContext>,
     hbs: State<'_, Handlebars<'_>>,
-    pool: State<'_, BrowserPool>,
+    pool: State<'_, Pool<Option<Client>>>,
+    config: State<'_, Config>,
 ) -> StdResult<Content<Vec<u8>>, Debug<Error>> {
-    tracing::info!("Pool status: {:#?}", pool.status());
+    let status = pool.status();
 
-    let mut conn = pool.get().await.unwrap();
+    let mut conn = if let Some(client) = Object::take(pool.get().await) {
+        client
+    } else {
+        Client::new(&config.webdriver_url).await.map_err(Error::new)?
+    };
 
     let html = hbs
         .render(&template_ctx.name, &template_ctx.ctx)
@@ -66,6 +75,16 @@ async fn template(
     // client can only have 1 at a time??
     let bytes = conn.screenshot().await.map_err(Error::new).map_err(Debug)?;
 
+    if !config.pool_keep_alive {
+        if let Err(_) = pool.try_add(None) {
+            tracing::warn!("Failed to add None to pool");
+        }
+    } else {
+        if let Err(_) = pool.try_add(Some(conn)) {
+            tracing::warn!("Failed to add Some(conn) to pool");
+        }
+    }
+
     Ok(Content(ContentType::PNG, bytes))
 }
 
@@ -81,8 +100,32 @@ fn rocket() -> Result<rocket::Rocket> {
     let mut handlebars = Handlebars::new();
     handlebars.register_templates_directory(".hbs", "templates/")?;
 
+    let pool_size = config.pool_size.unwrap_or(4);
+
+    let pool_init: Vec<Option<Client>> = (0..pool_size).map(|_| None).collect();
+
+    let pool = Pool::from(pool_init);
+
+    // Select pool type
+    /*
+    let pool: Pool = match config.pool_type.map_or("ephemeral", |t| t.as_str()) {
+        "persisted" => {
+            let mgr = BrowserManager::new(&config.webdriver_url);
+            let pool = PersistedBrowserPool::new(mgr, pool_size);
+
+            pool.into()
+        },
+        "ephemeral" => {
+            BrowserPool::new(&config.webdriver_url, pool_size).into()
+        }
+        _ => {
+            anyhow::bail!("Invalid browser pool type, requires either `persisted`, `ephemeral`");
+        }
+    };
+    */
+
+    tracing::info!("Config: {:#?}", &config);
     tracing::info!("Connecting to WebDriver URL: {}", &config.webdriver_url);
-    let pool = BrowserPool::new(&config.webdriver_url, 4);
 
     let prometheus = PrometheusMetrics::new();
 
@@ -90,6 +133,7 @@ fn rocket() -> Result<rocket::Rocket> {
         .manage(pool)
         .manage(handlebars)
         .attach(prometheus.clone())
+        .attach(AdHoc::config::<Config>())
         .mount("/", routes![index, template]);
 
     Ok(r)

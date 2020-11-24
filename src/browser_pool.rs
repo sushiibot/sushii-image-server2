@@ -1,10 +1,9 @@
 use anyhow::{Error, Result};
 use async_trait::async_trait;
 use fantoccini::Client;
-/*
 use deadpool::managed::{self, Manager, RecycleResult, RecycleError};
 
-pub type Pool = managed::Pool<Client, Error>;
+pub type PersistedBrowserPool = managed::Pool<Client, Error>;
 
 pub struct BrowserManager {
     url: String,
@@ -31,20 +30,9 @@ impl Manager<Client, Error> for BrowserManager {
     }
 
     async fn recycle(&self, conn: &mut Client) -> RecycleResult<Error> {
-        // Instead of keeping clients open, they are terminated which also
-        // closes the associated browser process. This prevents memory leaks as
-        // mentioned above and prevents browsers from accumulating memory use.
-
-        /*
-        conn.close().await
-            .map_err(Error::new)
-            .map_err(RecycleError::from)?;
-        */
-
-        None
+        Ok(())
     }
 }
-*/
 
 use std::ops::{Deref, DerefMut};
 use tokio::sync::Semaphore;
@@ -62,12 +50,12 @@ pub struct BrowserPool {
 }
 
 #[async_trait]
-pub trait Manager {
+pub trait BrowserPoolManager {
     async fn get(&self) -> Result<BrowserClientGuard<'_>>;
 }
 
 #[async_trait]
-impl Manager for BrowserPool {
+impl BrowserPoolManager for BrowserPool {
     async fn get(&self) -> Result<BrowserClientGuard<'_>> {
         Ok(BrowserClientGuard {
             _permit: self.semaphore.acquire().await,
