@@ -49,6 +49,11 @@ impl Manager<Client, Error> for BrowserManager {
 use std::ops::{Deref, DerefMut};
 use tokio::sync::Semaphore;
 
+/// This Browser "Pool" isn't really an actual pool in the sense that it keeps
+/// connections and browser processes running. This will drop the fantoccini
+/// client when a BrowserClientGuard goes out of scope in order to have the sole
+/// purpose of limiting the max number of running browser processes and
+/// WebDriver clients running at a given time
 pub struct BrowserPool {
     semaphore: Semaphore,
     /// Initial number of semaphore permits
