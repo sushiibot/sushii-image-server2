@@ -1735,6 +1735,7 @@ dependencies = [
  "rocket_contrib",
  "rocket_prometheus",
  "serde",
+ "tokio 0.2.23",
  "tracing",
  "tracing-subscriber",
 ]
