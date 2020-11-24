@@ -1,4 +1,7 @@
 #[cfg(test)]
+#[macro_use] extern crate bencher;
+
+#[cfg(test)]
 mod tests;
 
 #[macro_use]
@@ -15,11 +18,12 @@ use rocket_contrib::json::JsonValue;
 use serde::Deserialize;
 use std::result::Result as StdResult;
 use rocket_prometheus::PrometheusMetrics;
+use tokio::signal::unix::{signal, SignalKind};
 
 mod browser_pool;
 mod config;
 
-use browser_pool::{BrowserManager, Pool};
+use browser_pool::{Manager, BrowserPool};
 use config::Config;
 
 #[derive(Deserialize)]
@@ -40,7 +44,7 @@ struct TemplateContext {
 async fn template(
     template_ctx: Json<TemplateContext>,
     hbs: State<'_, Handlebars<'_>>,
-    pool: State<'_, Pool>,
+    pool: State<'_, BrowserPool>,
 ) -> StdResult<Content<Vec<u8>>, Debug<Error>> {
     tracing::info!("Pool status: {:#?}", pool.status());
 
@@ -77,8 +81,8 @@ fn rocket() -> Result<rocket::Rocket> {
     let mut handlebars = Handlebars::new();
     handlebars.register_templates_directory(".hbs", "templates/")?;
 
-    let mgr = BrowserManager::new(&config.webdriver_url);
-    let pool = Pool::new(mgr, 4);
+    tracing::info!("Connecting to WebDriver URL: {}", &config.webdriver_url);
+    let pool = BrowserPool::new(&config.webdriver_url, 4);
 
     let prometheus = PrometheusMetrics::new();
 
@@ -94,7 +98,44 @@ fn rocket() -> Result<rocket::Rocket> {
 #[rocket::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt().init();
-    rocket()?.launch().await?;
+    let r = rocket()?;
+
+    /*
+    let handle = r.shutdown();
+
+    let signal_kinds = vec![
+        SignalKind::hangup(),
+        SignalKind::interrupt(),
+        SignalKind::terminate(),
+    ];
+
+    for signal_kind in signal_kinds {
+        let mut stream = signal(signal_kind).unwrap();
+        let shard_manager = client.shard_manager.clone();
+        let pool = pool.clone();
+        let mut metrics_sender = metrics_sender.clone();
+
+        tokio::spawn(async move {
+            stream.recv().await;
+            tracing::info!("Signal received, shutting down...");
+            shard_manager.lock().await.shutdown_all().await;
+
+            tracing::info!("Closing database pool...");
+            pool.close().await;
+
+            tracing::info!("Shutting down metrics server...");
+            metrics_sender
+                .send(())
+                .await
+                .expect("Failed to shut down metrics server");
+
+            tracing::info!("bye");
+        });
+    }
+    */
+
+    // Start server
+    r.launch().await?;
 
     Ok(())
 }
