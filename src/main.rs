@@ -1,8 +1,4 @@
 #[cfg(test)]
-#[macro_use]
-extern crate bencher;
-
-#[cfg(test)]
 mod tests;
 
 #[macro_use]
