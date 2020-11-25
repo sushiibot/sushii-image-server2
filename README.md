@@ -72,11 +72,11 @@ curl localhost:8000/template \
 
 ## Benchmarks
 
-With `pool_keep_alive`, it will keep WebDriver sessions persistent and therefore
-keep the associated browser process open.  This prevents the need to re-create
-WebDriver sessions and need to restart processes each request at the cost of
-higher average memory usage. This would be ideal for situations where there is
-the need of higher throughput and lower latency.
+With `pool_keep_alive` enabled, it will keep WebDriver sessions persistent and
+therefore keep the associated browser process open.  This prevents the need to
+re-create WebDriver sessions and need to restart processes each request at the
+cost of higher average memory usage. This would be ideal for situations where
+there is the need of higher throughput and lower latency.
 
 The following tests use [bombardier](https://github.com/codesenberg/bombardier).
 
