@@ -3,6 +3,8 @@ mod tests;
 
 #[macro_use]
 extern crate rocket;
+#[macro_use]
+extern crate rocket_contrib;
 
 use anyhow::{Error, Result};
 use deadpool::unmanaged::{Object, Pool};
@@ -58,10 +60,11 @@ async fn template(
 
     let html = hbs
         .render(&template_ctx.name, &template_ctx.ctx)
+        .map(base64::encode)
         .map_err(Error::new)
         .map_err(Debug)?;
 
-    conn.goto(&format!("data:text/html;charset=utf-8,{}", html))
+    conn.goto(&format!("data:text/html;base64,{}", html))
         .await
         .map_err(Error::new)
         .map_err(Debug)?;
