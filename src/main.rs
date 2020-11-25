@@ -13,8 +13,8 @@ use rocket::http::ContentType;
 use rocket::response::content::Content;
 use rocket::response::Debug;
 use rocket::State;
-use rocket_contrib::json::Json;
-use rocket_contrib::json::JsonValue;
+use rocket_contrib::json::{Json, JsonValue};
+use rocket_contrib::serve::StaticFiles;
 use rocket_prometheus::PrometheusMetrics;
 use serde::Deserialize;
 use std::result::Result as StdResult;
@@ -109,6 +109,7 @@ fn rocket() -> Result<rocket::Rocket> {
     let r = rocket::custom(figment)
         .manage(pool.clone())
         .manage(handlebars)
+        .mount("/static", StaticFiles::from("./static"))
         .attach(prometheus.clone())
         .attach(AdHoc::config::<Config>())
         .mount("/", routes![index, template]);
