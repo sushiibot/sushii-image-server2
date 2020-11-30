@@ -30,10 +30,12 @@ use config::Config;
 struct TemplateContext {
     /// Template name
     pub name: String,
+    /// External template HTML to render
+    pub html: Option<String>,
     /// Screenshot width
-    pub width: Option<u64>,
+    pub width: Option<u32>,
     /// Screenshot height
-    pub height: Option<u64>,
+    pub height: Option<u32>,
     /// Jpeg image quality (0-100)
     pub jpeg_quality: Option<u64>,
     /// Template context data
@@ -57,6 +59,14 @@ async fn template(
             .await
             .map_err(Error::new)?
     };
+
+    // Change window size
+    match (template_ctx.width, template_ctx.height) {
+        (Some(w), Some(h)) => {
+            conn.set_window_size(w, h + 114).await.map_err(Error::new)?;
+        }
+        _ => {}
+    }
 
     let html = hbs
         .render(&template_ctx.name, &template_ctx.ctx)
@@ -94,7 +104,8 @@ fn index() -> &'static str {
 }
 
 fn rocket() -> Result<rocket::Rocket> {
-    let figment = rocket::Config::figment();
+    // Override ctrlc option to disable it as we handle it ourselves
+    let figment = rocket::Config::figment().merge(("ctrlc", false));
     let config: Config = figment.extract()?;
 
     let mut handlebars = Handlebars::new();
