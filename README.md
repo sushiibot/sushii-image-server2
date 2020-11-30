@@ -8,6 +8,15 @@ images.
 
 Optionally maintains a pool of persistent WebDriver sessions.
 
+**Note:** This project has been discontinued in
+favor of using the original [sushii-image-server](https://github.com/sushiibot/sushii-image-server).
+This was written to test out Rust libraries to interact with a
+headless browser. However, the features are limited as fantoccini communicates
+through WebDriver as compared to puppeteer which uses the DevTools protocol.
+Main feature that makes this project not as usable is the fact that WebDriver
+can only modify the entire browser window and not the viewport. It also provides
+not much additional performance gain.
+
 ## Usage
 
 sushii image server requires a WebDriver compatible process running in order
